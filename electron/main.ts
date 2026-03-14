@@ -15,7 +15,6 @@ async function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
-    titleBarStyle: 'hiddenInset',
     show: true
   })
 
