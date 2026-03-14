@@ -1,49 +1,52 @@
-import { Skill } from '../../shared/types/skill'
+import fs from 'fs/promises';
+import path from 'path';
+import { BasicSkill, SkillExecutionContext } from '../../shared/types/skill';
 
-export const FileManagerSkill: Skill = {
+export const FileManagerSkill: BasicSkill = {
   id: 'file-manager',
   name: 'File Manager',
   description: 'Manage files and directories on the local filesystem',
   category: 'basic',
   requiredPermissions: [{ type: 'filesystem', resource: '*' }],
 
-  async execute(params, context) {
-    const { action, path, content } = params as {
-      action: 'read' | 'write' | 'delete' | 'list'
-      path: string
-      content?: string
-    }
+  async execute(params, context: SkillExecutionContext) {
+    const { action, path: filePath, content } = params as {
+      action: 'read' | 'write' | 'delete' | 'list';
+      path: string;
+      content?: string;
+    };
 
-    context.sendProgress({ status: 'started', action, path })
+    context.sendProgress({ status: 'started', action, path: filePath });
 
     try {
       switch (action) {
         case 'read':
-          const fileContent = await window.electronAPI.readFile(path)
-          context.sendProgress({ status: 'completed', action })
-          return fileContent
+          const fileContent = await fs.readFile(filePath, 'utf-8');
+          context.sendProgress({ status: 'completed', action });
+          return { success: true, data: fileContent };
 
         case 'write':
-          await window.electronAPI.writeFile(path, content || '')
-          context.sendProgress({ status: 'completed', action })
-          return { success: true }
+          await fs.mkdir(path.dirname(filePath), { recursive: true });
+          await fs.writeFile(filePath, content || '', 'utf-8');
+          context.sendProgress({ status: 'completed', action });
+          return { success: true };
 
         case 'delete':
-          await window.electronAPI.deleteFile(path)
-          context.sendProgress({ status: 'completed', action })
-          return { success: true }
+          await fs.unlink(filePath);
+          context.sendProgress({ status: 'completed', action });
+          return { success: true };
 
         case 'list':
-          const entries = await window.electronAPI.listDirectory(path)
-          context.sendProgress({ status: 'completed', action })
-          return entries
+          const entries = await fs.readdir(filePath);
+          context.sendProgress({ status: 'completed', action });
+          return { success: true, data: entries };
 
         default:
-          throw new Error(`Unknown action: ${action}`)
+          throw new Error(`Unknown action: ${action}`);
       }
     } catch (error) {
-      context.sendProgress({ status: 'error', error: (error as Error).message })
-      throw error
+      context.sendProgress({ status: 'error', error: (error as Error).message });
+      throw error;
     }
   }
-}
+};
