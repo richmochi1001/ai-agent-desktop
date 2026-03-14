@@ -1,55 +1,20 @@
-import { IpcMain } from 'electron'
-import { PermissionManager } from '../permissions'
-import { SkillRegistry } from '../skills/registry'
+cat > electron/ipc/skills.ts << 'EOF'
+import { ipcMain } from 'electron'
+import { FileManagerSkill } from '../../skills/basic/file-manager'
+import { DocumentProcessorSkill } from '../../skills/basic/document-processor'
+import { WebBrowserSkill } from '../../skills/basic/web-browser'
 
-export function setupSkillsIPC(
-  ipcMain: IpcMain,
-  permissionManager: PermissionManager
-) {
-  const skillRegistry = new SkillRegistry()
+const allSkills = [
+  { id: FileManagerSkill.id, name: FileManagerSkill.name, description: FileManagerSkill.description, category: FileManagerSkill.category },
+  { id: DocumentProcessorSkill.id, name: DocumentProcessorSkill.name, description: DocumentProcessorSkill.description, category: DocumentProcessorSkill.category },
+  { id: WebBrowserSkill.id, name: WebBrowserSkill.name, description: WebBrowserSkill.description, category: WebBrowserSkill.category },
+]
 
-  // Execute a skill
-  ipcMain.handle('skill:execute', async (event, skillId: string, params: Record<string, unknown>) => {
-    try {
-      const skill = skillRegistry.getSkill(skillId)
-      if (!skill) {
-        return { success: false, error: `Skill not found: ${skillId}` }
-      }
-
-      // Check permissions
-      for (const permission of skill.requiredPermissions) {
-        const hasPermission = await permissionManager.hasPermission(
-          permission.type,
-          permission.resource
-        )
-        if (!hasPermission) {
-          return {
-            success: false,
-            error: `Missing required permission: ${permission.type}:${permission.resource}`
-          }
-        }
-      }
-
-      // Execute skill
-      const result = await skill.execute(params, {
-        sendProgress: (progress) => {
-          event.sender.send('skill:progress', progress)
-        }
-      })
-
-      return { success: true, result }
-    } catch (error) {
-      return { success: false, error: (error as Error).message }
-    }
-  })
-
-  // Get available skills
-  ipcMain.handle('skill:getAvailable', async () => {
-    return skillRegistry.getAllSkills().map(skill => ({
-      id: skill.id,
-      name: skill.name,
-      description: skill.description,
-      category: skill.category
-    }))
+export function registerSkillsHandlers(): void {
+  ipcMain.handle('skills:getAll', async () => ({ success: true, data: allSkills }))
+  ipcMain.handle('skills:getById', async (_, id: string) => {
+    const skill = allSkills.find(s => s.id === id)
+    return skill ? { success: true, data: skill } : { success: false, error: 'Not found' }
   })
 }
+EOF
